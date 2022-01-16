@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:battery_plus/battery_plus.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,11 +32,31 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  final Battery _battery = Battery();
 
-  void _incrementCounter() {
+  BatteryState? _batteryState;
+  StreamSubscription<BatteryState>? _batteryStateSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _battery.batteryState.then(_updateBatteryState);
+    _batteryStateSubscription =
+        _battery.onBatteryStateChanged.listen(_updateBatteryState);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    if (_batteryStateSubscription != null) {
+      _batteryStateSubscription!.cancel();
+    }
+  }
+
+  void _updateBatteryState(BatteryState state) {
+    if (_batteryState == state) return;
     setState(() {
-      _counter++;
+      _batteryState = state;
     });
   }
 
@@ -46,21 +69,51 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+          children: [
+            Text('$_batteryState'),
+            ElevatedButton(
+              onPressed: () async {
+                final batteryLevel = await _battery.batteryLevel;
+
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    content: Text('Battery: $batteryLevel%'),
+                    actions: <Widget>[
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        child: const Text('OK'),
+                      )
+                    ],
+                  ),
+                );
+              },
+              child: const Text('Get battery level'),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
+            ElevatedButton(
+                onPressed: () async {
+                  final isInPowerSaveMode = await _battery.isInBatterySaveMode;
+
+                  showDialog<void>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      content: Text('Is on low power mode: $isInPowerSaveMode'),
+                      actions: <Widget>[
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: const Text('OK'),
+                        )
+                      ],
+                    ),
+                  );
+                },
+                child: const Text('Is on low power mode'))
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }
